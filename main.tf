@@ -30,7 +30,7 @@ module "iam" {
 module "ec2" {
   source             = "./modules/ec2"
   ami_id             = "ami-0abcd1234efgh5678"
-  instance_type      = "t3.micro"
+  instance_type      = "t2.micro"
   subnet_id          = module.vpc.public_subnet_id
   security_group_ids = [module.security_group.sg_id]
   key_name           = "my-key"
