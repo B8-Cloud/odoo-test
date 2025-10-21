@@ -1,5 +1,5 @@
 locals {
-  azs = length(var.azs) > 0 ? var.azs : data.aws_availability_zones.available.names[0: length(var.public_subnet_cidrs)]
+  azs = length(var.azs) > 0 ? var.azs : slice(data.aws_availability_zones.available.names, 0, length(var.public_subnet_cidrs))
   zone_count = length(local.azs)
 }
 
