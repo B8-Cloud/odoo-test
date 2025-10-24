@@ -2,22 +2,46 @@ name: Notify Google Chat on Push
 
 on:
   push:
-    branches:
-      - main
-      - dev
-      - staging
 
 jobs:
   notify:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Send message to Google Chat
+      - name: Collect push details
+        id: details
         run: |
+          # Extract details
           COMMITTER=${{ github.actor }}
           BRANCH=${{ github.ref_name }}
-          MESSAGE="${COMMITTER} pushed to branch ${BRANCH} in repository ${{ github.repository }}"
+          REPO=${{ github.repository }}
+          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+          COMMIT_URL=${{ github.event.head_commit.url }}
 
+          # Get list of changed files
+          CHANGED_FILES=$(echo "${{ github.event.head_commit.modified[*] }}" | tr ' ' '\n')
+          ADDED_FILES=$(echo "${{ github.event.head_commit.added[*] }}" | tr ' ' '\n')
+          REMOVED_FILES=$(echo "${{ github.event.head_commit.removed[*] }}" | tr ' ' '\n')
+
+          # Format message for Google Chat
+          MESSAGE="*Git Push Alert* 🚀\n
+*Repository:* ${REPO}\n
+*Branch:* ${BRANCH}\n
+*Pushed by:* ${COMMITTER}\n
+*Commit Message:* ${COMMIT_MESSAGE}\n
+*Commit URL:* ${COMMIT_URL}\n\n
+*🟢 Added files:*\n${ADDED_FILES}\n
+*🟡 Modified files:*\n${CHANGED_FILES}\n
+*🔴 Removed files:*\n${REMOVED_FILES}"
+
+          # Save to output for next step
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "$MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Send message to Google Chat
+        run: |
           curl -X POST \
             -H 'Content-Type: application/json' \
-            -d "{\"text\": \"${MESSAGE}\"}" \
+            -d "{\"text\": \"${{ steps.details.outputs.message }}\"}" \
             ${{ secrets.GCHAT_WEBHOOK }}
