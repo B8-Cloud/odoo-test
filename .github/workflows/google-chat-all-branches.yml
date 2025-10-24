@@ -1,7 +1,7 @@
 name: Notify Google Chat on Push
 
 on:
-  push: 
+  push:
     branches:
       - '**'  # all branches
 
@@ -17,18 +17,21 @@ jobs:
           REPO="${{ github.repository }}"
           BRANCH="${GITHUB_REF##*/}"
           ACTOR="${{ github.actor }}"
-          
-          COMMITS=$(jq -r 'if .commits == null then [] else .commits end' "$GITHUB_EVENT_PATH")
+
+          # Safely get commits array; empty array if null
+          COMMITS=$(jq -c 'if .commits == null then [] else .commits end' "$GITHUB_EVENT_PATH")
           COUNT=$(echo "$COMMITS" | jq 'length')
 
+          # Build commits list with message, author, and changed files
           COMMITS_HTML=$(
-            echo "$COMMITS" | jq -r '[.[:5][] | 
-              "• " + (.message | gsub("\\r?\\n"; " ")) + 
-              " (by " + .author.username + ")" +
-              " - Files changed: " + ((.added + .modified + .removed) | join(", "))
-            ] | join("<br>")'
+            echo "$COMMITS" | jq -r 'map(
+              "• " + (.message | gsub("\\r?\\n"; " ")) +
+              " (by " + (.author.username // "unknown") + ")" +
+              " - Files changed: " + ((.added + .modified + .removed) // [] | join(", "))
+            ) | join("<br>")'
           )
 
+          # Send formatted message to Google Chat
           jq -n \
             --arg repo "$REPO" \
             --arg branch "$BRANCH" \
