@@ -1,51 +1,59 @@
-- name: Notify Google Chat
-  if: ${{ github.event_name == 'push' }}
-  env:
-    WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK }}
-  run: |
-    REPO="${{ github.repository }}"
-    BRANCH="${GITHUB_REF##*/}"
-    ACTOR="${{ github.actor }}"
-    
-    # Safely get commits, default to empty array if null
-    COMMITS=$(jq -r 'if .commits == null then [] else .commits end' "$GITHUB_EVENT_PATH")
-    COUNT=$(echo "$COMMITS" | jq 'length')
+name: Notify Google Chat on Push
 
-    # Build last 5 commits with files changed
-    COMMITS_HTML=$(
-      echo "$COMMITS" | jq -r '[.[:5][] | 
-        "• " + (.message | gsub("\\r?\\n"; " ")) + 
-        " (by " + .author.username + ")" +
-        " - Files changed: " + ((.added + .modified + .removed) | join(", "))
-      ] | join("<br>")'
-    )
+on:
+  push: 
+    branches:
+      - '**'  # all branches
 
-    # Send to Google Chat
-    jq -n \
-      --arg repo "$REPO" \
-      --arg branch "$BRANCH" \
-      --arg actor "$ACTOR" \
-      --arg count "$COUNT" \
-      --arg commits "$COMMITS_HTML" \
-      '{
-        cardsV2: [{
-          cardId: "push-card",
-          card: {
-            header: {
-              title: ("🚀 New push to branch " + $branch),
-              subtitle: $repo
-            },
-            sections: [
-              { widgets: [
-                { textParagraph: { text: ("<b>Repository:</b> " + $repo + "<br><b>Branch:</b> " + $branch + "<br><b>Pusher:</b> " + $actor + "<br><b>Commit count:</b> " + $count) } }
-              ]},
-              { header: "Commits",
-                widgets: [
-                  { textParagraph: { text: ($commits // "No commits found") } }
-                ]
-              }
-            ]
-          }
-        }]
-      }' \
-    | curl -s -X POST -H 'Content-Type: application/json; charset=UTF-8' -d @- "$WEBHOOK_URL"
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send message to Google Chat
+        if: ${{ github.event_name == 'push' }}
+        env:
+          WEBHOOK_URL: ${{ secrets.GCHAT_WEBHOOK }}
+        run: |
+          REPO="${{ github.repository }}"
+          BRANCH="${GITHUB_REF##*/}"
+          ACTOR="${{ github.actor }}"
+          
+          COMMITS=$(jq -r 'if .commits == null then [] else .commits end' "$GITHUB_EVENT_PATH")
+          COUNT=$(echo "$COMMITS" | jq 'length')
+
+          COMMITS_HTML=$(
+            echo "$COMMITS" | jq -r '[.[:5][] | 
+              "• " + (.message | gsub("\\r?\\n"; " ")) + 
+              " (by " + .author.username + ")" +
+              " - Files changed: " + ((.added + .modified + .removed) | join(", "))
+            ] | join("<br>")'
+          )
+
+          jq -n \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg count "$COUNT" \
+            --arg commits "$COMMITS_HTML" \
+            '{
+              cardsV2: [{
+                cardId: "push-card",
+                card: {
+                  header: {
+                    title: ("🚀 New push to branch " + $branch),
+                    subtitle: $repo
+                  },
+                  sections: [
+                    { widgets: [
+                      { textParagraph: { text: ("<b>Repository:</b> " + $repo + "<br><b>Branch:</b> " + $branch + "<br><b>Pusher:</b> " + $actor + "<br><b>Commit count:</b> " + $count) } }
+                    ]},
+                    { header: "Commits",
+                      widgets: [
+                        { textParagraph: { text: ($commits // "No commits found") } }
+                      ]
+                    }
+                  ]
+                }
+              }]
+            }' \
+          | curl -s -X POST -H 'Content-Type: application/json; charset=UTF-8' -d @- "$WEBHOOK_URL"
