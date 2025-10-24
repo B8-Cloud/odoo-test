@@ -1,0 +1,23 @@
+name: Notify Google Chat on Push
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - staging
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send message to Google Chat
+        run: |
+          COMMITTER=${{ github.actor }}
+          BRANCH=${{ github.ref_name }}
+          MESSAGE="${COMMITTER} pushed to branch ${BRANCH} in repository ${{ github.repository }}"
+
+          curl -X POST \
+            -H 'Content-Type: application/json' \
+            -d "{\"text\": \"${MESSAGE}\"}" \
+            ${{ secrets.GCHAT_WEBHOOK }}
